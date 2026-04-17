@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chess</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Space+Grotesk:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="app-container">
+        <aside class="sidebar left-sidebar">
+            <div class="logo-container">
+                <div class="logo-icon">◈</div>
+                <h1 class="logo">Chess</h1>
+                <span class="logo-subtitle">Synthwave chess board</span>
+            </div>
+            
+            <div class="controls panel">
+                <button id="btn-new-game" class="btn primary">
+                    <span class="btn-icon">⬡</span>
+                    <span>New Game</span>
+                </button>
+                <div class="btn-row">
+                    <button id="btn-undo" class="btn">
+                        <span class="btn-icon">↲</span>
+                        <span>Undo</span>
+                    </button>
+                    <button id="btn-flip" class="btn">
+                        <span class="btn-icon">⇆</span>
+                        <span>Flip</span>
+                    </button>
+                </div>
+                <button id="btn-hints" class="btn toggle">
+                    <span class="toggle-indicator"></span>
+                    <span>Legal Hints</span>
+                </button>
+            </div>
+
+            <div class="captured-panel panel">
+                <div class="panel-header">
+                    <span class="panel-icon">⬢</span>
+                    <h3>Captured</h3>
+                </div>
+                <div class="pieces-box" id="captured-by-white"></div>
+            </div>
+
+            <div class="captured-panel panel dark">
+                <div class="panel-header dark">
+                    <span class="panel-icon">⬢</span>
+                    <h3>Opponent</h3>
+                </div>
+                <div class="pieces-box" id="captured-by-black"></div>
+            </div>
+        </aside>
+
+        <main class="board-area">
+            <div class="board-wrapper" id="board-wrapper">
+                <div class="board-frame">
+                    <div class="corner-tl"></div>
+                    <div class="corner-tr"></div>
+                    <div class="corner-bl"></div>
+                    <div class="corner-br"></div>
+                    <div class="rank-labels" id="rank-labels"></div>
+                    <div class="file-labels" id="file-labels"></div>
+                    <div id="board" class="chessboard player-white"></div>
+                </div>
+                <div class="scanline"></div>
+            </div>
+            <div class="game-status" id="game-status">
+                <div class="status-indicator"></div>
+                <span id="status-text">White to move</span>
+            </div>
+        </main>
+
+        <aside class="sidebar right-sidebar">
+            <div class="panel move-log">
+                <div class="panel-header">
+                    <span class="panel-icon">▤</span>
+                    <h3>Move History</h3>
+                </div>
+                <div id="move-history" class="move-list"></div>
+            </div>
+            
+            <div class="panel ai-coach">
+                <div class="coach-header">
+                    <div class="coach-avatar">
+                        <span class="avatar-icon">◈</span>
+                        <span class="avatar-pulse"></span>
+                    </div>
+                    <div class="coach-title">
+                        <span class="coach-name">chess buddy</span>
+                        <span class="coach-status">Online</span>
+                    </div>
+                </div>
+                <div class="coach-chat" id="coach-chat">
+                    <div class="msg assistant">
+                        <div class="msg-icon">◈</div>
+                        <div class="msg-content">Ready to analyze. Ask me about the position, openings, or strategy.</div>
+                    </div>
+                </div>
+                <div class="coach-input">
+                    <input type="text" id="coach-input" placeholder="Ask about the position..." autocomplete="off">
+                    <button id="btn-coach-send" aria-label="Send message">
+                        <span>➜</span>
+                    </button>
+                </div>
+            </div>
+        </aside>
+    </div>
+
+    <div id="promotion-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="promotion-title">
+        <div class="modal-backdrop"></div>
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="promotion-title">Select Promotion</h3>
+            </div>
+            <div class="promotion-choices" id="promotion-choices">
+                <button class="promo-choice" data-piece="q" aria-label="Promote to Queen">
+                    <span class="promo-piece">♛</span>
+                    <span class="promo-label">Queen</span>
+                </button>
+                <button class="promo-choice" data-piece="r" aria-label="Promote to Rook">
+                    <span class="promo-piece">♜</span>
+                    <span class="promo-label">Rook</span>
+                </button>
+                <button class="promo-choice" data-piece="b" aria-label="Promote to Bishop">
+                    <span class="promo-piece">♝</span>
+                    <span class="promo-label">Bishop</span>
+                </button>
+                <button class="promo-choice" data-piece="n" aria-label="Promote to Knight">
+                    <span class="promo-piece">♞</span>
+                    <span class="promo-label">Knight</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
+    <script src="script.js?v=2"></script>
+</body>
+</html>
+
+
+
+
