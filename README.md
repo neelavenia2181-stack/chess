@@ -1,6 +1,7 @@
 # ♞ Synthwave Chess
 
 A modern chess game with a synthwave aesthetic, built with vanilla JavaScript and the [chess.js](https://github.com/jhlywa/chess.js) library.
+> Note: the AI bot implementation still in progress
 
 ## Features
 
