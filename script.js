@@ -15,6 +15,12 @@ const capturedBlackEl = document.getElementById('captured-by-black');
 let selectedSquare = null;
 let legalMovesForSelected = [];
 let pendingPromotionMove = null;
+let draggedSquare = null;
+
+let gameMode = null; // 'bot' or 'online'
+let playerColor = 'w';
+let currentRoomId = null;
+let socket = null;
 
 // Unicode piece mapping
 const PIECE_UNICODE = {
@@ -27,6 +33,39 @@ const PIECE_UNICODE_EXACT = {
     'w': {'p': '♙', 'n': '♘', 'b': '♗', 'r': '♖', 'q': '♕', 'k': '♔'},
     'b': {'p': '♟', 'n': '♞', 'b': '♝', 'r': '♜', 'q': '♛', 'k': '♚'}
 };
+
+// Add piece values for basic bot logic
+const pieceValues = { p: 1, n: 3, b: 3, r: 5, q: 9, k: 0 };
+
+function makeBotMove() {
+    if (game.game_over()) return;
+    
+    const moves = game.moves({ verbose: true });
+    if (moves.length === 0) return;
+    
+    // Sort moves by potential capture value (descending)
+    moves.sort((a, b) => {
+        let scoreA = 0;
+        let scoreB = 0;
+        if (a.captured) scoreA = pieceValues[a.captured] || 0;
+        if (b.captured) scoreB = pieceValues[b.captured] || 0;
+        // Promote is also good
+        if (a.promotion) scoreA += 8;
+        if (b.promotion) scoreB += 8;
+        return scoreB - scoreA;
+    });
+    
+    // Take the best move, or pick randomly among moves with the same best score
+    const bestScore = (moves[0].captured ? pieceValues[moves[0].captured] : 0) + (moves[0].promotion ? 8 : 0);
+    const bestMoves = moves.filter(m => {
+        const score = (m.captured ? pieceValues[m.captured] : 0) + (m.promotion ? 8 : 0);
+        return score === bestScore;
+    });
+    
+    const chosenMove = bestMoves[Math.floor(Math.random() * bestMoves.length)];
+    
+    executeMove({ from: chosenMove.from, to: chosenMove.to, promotion: chosenMove.promotion });
+}
 
 function initBoard() {
     drawLabels();
@@ -199,8 +238,66 @@ function renderBoard() {
                 const pieceEl = document.createElement('div');
                 pieceEl.className = `piece ${piece.color}`;
                 pieceEl.textContent = PIECE_UNICODE_EXACT[piece.color][piece.type];
+                
+                // Only make pieces draggable if it's the player's turn
+                if (!game.game_over() && 
+                    ((gameMode === 'online' && piece.color === playerColor && game.turn() === playerColor) || 
+                     (gameMode !== 'online' && piece.color === game.turn()))) {
+                    pieceEl.draggable = true;
+                    
+                    pieceEl.addEventListener('dragstart', (e) => {
+                        draggedSquare = sqId;
+                        selectedSquare = sqId;
+                        legalMovesForSelected = game.moves({ square: sqId, verbose: true });
+                        
+                        // Manually add highlights to avoid DOM re-creation
+                        const squares = document.querySelectorAll('.square');
+                        squares.forEach(sq => {
+                            sq.classList.remove('selected', 'valid-move', 'capture');
+                            if (sq.dataset.sq === sqId) {
+                                sq.classList.add('selected');
+                            }
+                            const moveObj = legalMovesForSelected.find(m => m.to === sq.dataset.sq);
+                            if (moveObj && hintsEnabled) {
+                                sq.classList.add('valid-move');
+                                if (game.get(sq.dataset.sq) || moveObj.flags.includes('e')) {
+                                    sq.classList.add('capture');
+                                }
+                            }
+                        });
+                        
+                        document.getElementById('board-wrapper').classList.add('active-glow');
+                        
+                        setTimeout(() => e.target.style.opacity = '0.5', 0);
+                    });
+                    
+                    pieceEl.addEventListener('dragend', (e) => {
+                        e.target.style.opacity = '1';
+                        draggedSquare = null;
+                    });
+                }
+                
                 squareEl.appendChild(pieceEl);
             }
+            
+            squareEl.addEventListener('dragover', (e) => {
+                e.preventDefault(); // Necessary to allow dropping
+            });
+            
+            squareEl.addEventListener('drop', (e) => {
+                e.preventDefault();
+                if (draggedSquare) {
+                    const toSquare = sqId;
+                    const fromSquare = draggedSquare;
+                    
+                    // Let handleSquareClick handle the logic of making the move
+                    selectedSquare = fromSquare; 
+                    legalMovesForSelected = game.moves({ square: fromSquare, verbose: true });
+                    handleSquareClick(toSquare);
+                    
+                    draggedSquare = null;
+                }
+            });
             
             squareEl.addEventListener('click', () => handleSquareClick(sqId));
             
@@ -219,6 +316,7 @@ function renderBoard() {
 
 function handleSquareClick(sqId) {
     if (game.game_over()) return;
+    if (gameMode === 'online' && game.turn() !== playerColor) return;
     
     // If a square is selected, check if we are making a move
     if (selectedSquare) {
@@ -257,9 +355,10 @@ function handleSquareClick(sqId) {
     renderBoard();
 }
 
-function executeMove(moveObj) {
+function executeMove(moveObj, isRemote = false) {
     // Check if this move is a capture before making it
-    const isCapture = game.get(moveObj.to) !== null;
+    const fromPiece = game.get(moveObj.from);
+    const isCapture = game.get(moveObj.to) !== null || (fromPiece && fromPiece.type === 'p' && moveObj.from[0] !== moveObj.to[0] && game.get(moveObj.to) === null);
     const capturedPieceSquare = moveObj.to;
     
     const moveRes = game.move(moveObj);
@@ -267,6 +366,10 @@ function executeMove(moveObj) {
     legalMovesForSelected = [];
     
     if (moveRes) {
+        if (gameMode === 'online' && !isRemote) {
+            socket.emit('move', { roomId: currentRoomId, move: moveObj });
+        }
+        
         renderBoard();
         
         // Add move animation to destination square
@@ -295,8 +398,14 @@ function executeMove(moveObj) {
         // Coach trigger on checkmate/draw
         if (game.in_checkmate()) {
             setTimeout(() => addCoachMessage(`Checkmate! Amazing game. ${moveRes.color === 'w' ? 'White' : 'Black'} wins!`), 500);
+            if (typeof window.createFireworks === 'function') setTimeout(window.createFireworks, 500);
         } else if (game.in_draw() || game.in_stalemate() || game.in_threefold_repetition()) {
-            setTimeout(() => addCoachMessage("The game ends in a drawn position!"), 500);
+            setTimeout(() => addCoachMessage("Game Over - It's a Draw!"), 500);
+        } else {
+            // Trigger bot if it's black's turn
+            if (gameMode === 'bot' && game.turn() === 'b' && !game.game_over()) {
+                setTimeout(makeBotMove, 600);
+            }
         }
     }
 }
@@ -311,8 +420,8 @@ function updateStatus() {
     if (game.in_checkmate()) {
         text = `Checkmate! ${turnName === 'White' ? 'Black' : 'White'} wins.`;
         statusEl.classList.add('checkmate');
-    } else if (game.in_draw()) {
-        text = 'Game drawn';
+    } else if (game.in_draw() || game.in_stalemate() || game.in_threefold_repetition()) {
+        text = 'Game Over - Draw';
         statusEl.classList.add('draw');
     } else {
         text = `${turnName} to move`;
@@ -579,10 +688,114 @@ function initParticleSystem() {
         
         animateExplosion();
     };
+
+    // Create fireworks effect for winning
+    window.createFireworks = function() {
+        const colors = ['#ffd700', '#ff1493', '#00e5ff', '#ff6b35', '#a855f7'];
+        for (let i = 0; i < 8; i++) {
+            setTimeout(() => {
+                const x = Math.random() * canvas.width * 0.8 + canvas.width * 0.1;
+                const y = Math.random() * canvas.height * 0.5 + canvas.height * 0.1;
+                const color = colors[Math.floor(Math.random() * colors.length)];
+                
+                // Explode multiple times for bigger effect
+                window.createCaptureExplosion(x, y, color);
+                setTimeout(() => window.createCaptureExplosion(x + 20, y + 20, color), 100);
+                setTimeout(() => window.createCaptureExplosion(x - 20, y - 20, color), 200);
+            }, i * 400);
+        }
+    };
+}
+
+// Mode Selection Logic
+function setupModes() {
+    document.getElementById('btn-mode-bot').addEventListener('click', () => {
+        gameMode = 'bot';
+        document.getElementById('mode-modal').classList.add('hidden');
+        initBoard();
+    });
+
+    document.getElementById('btn-mode-online').addEventListener('click', () => {
+        gameMode = 'online';
+        document.getElementById('mode-modal').classList.add('hidden');
+        document.getElementById('lobby-modal').classList.remove('hidden');
+        initSocket();
+    });
+
+    document.getElementById('btn-lobby-back').addEventListener('click', () => {
+        document.getElementById('lobby-modal').classList.add('hidden');
+        document.getElementById('mode-modal').classList.remove('hidden');
+        if(socket) socket.disconnect();
+        socket = null;
+    });
+
+    document.getElementById('btn-create-room').addEventListener('click', () => {
+        if (socket) socket.emit('createRoom');
+    });
+
+    document.getElementById('btn-join-room').addEventListener('click', () => {
+        const code = document.getElementById('room-code-input').value.trim();
+        if (code && socket) {
+            socket.emit('joinRoom', code);
+        }
+    });
+}
+
+function initSocket() {
+    if(!socket) {
+        // We assume socket.io is loaded globally via script tag
+        socket = io();
+        
+        socket.on('roomCreated', (data) => {
+            currentRoomId = data.roomId;
+            playerColor = data.color;
+            document.getElementById('lobby-modal').classList.add('hidden');
+            showRoomInfo(currentRoomId);
+            addCoachMessage("Room created! Share code: " + currentRoomId);
+            initBoard();
+            boardFlipped = false;
+            renderBoard();
+        });
+        
+        socket.on('roomJoined', (data) => {
+            currentRoomId = data.roomId;
+            playerColor = data.color;
+            document.getElementById('lobby-modal').classList.add('hidden');
+            showRoomInfo(currentRoomId);
+            addCoachMessage("Joined room! You are playing Black.");
+            initBoard();
+            boardFlipped = true; // Auto flip for black
+            renderBoard();
+        });
+        
+        socket.on('gameStarted', (msg) => {
+            addCoachMessage(msg);
+        });
+        
+        socket.on('opponentMove', (moveObj) => {
+            executeMove(moveObj, true); // true = remote move
+        });
+        
+        socket.on('errorMsg', (msg) => {
+            document.getElementById('lobby-msg').textContent = msg;
+        });
+        
+        socket.on('opponentDisconnected', () => {
+            addCoachMessage("Opponent disconnected. You win!");
+            document.getElementById('status-text').textContent = "Opponent Left. You Win!";
+            document.getElementById('game-status').classList.add('checkmate');
+            if (typeof window.createFireworks === 'function') window.createFireworks();
+        });
+    }
+}
+
+function showRoomInfo(code) {
+    document.getElementById('room-info').classList.remove('hidden');
+    document.getElementById('room-code-display').textContent = code;
 }
 
 // Start game
-initBoard();
+setupModes();
 
 // Initialize particle system
 initParticleSystem();

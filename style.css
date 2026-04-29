@@ -28,7 +28,7 @@
     --highlight-selected: rgba(255, 20, 147, 0.35);
     
     --piece-white: #f8e8f4;
-    --piece-black: #1a0f25;
+    --piece-black: #00ff00;
 
     --border-subtle: rgba(255, 20, 147, 0.15);
     --border-glow: rgba(255, 20, 147, 0.4);
@@ -75,6 +75,11 @@ html {
 body {
     font-family: var(--font-body);
     background-color: var(--bg-deep);
+    background-image: 
+        radial-gradient(circle at 15% 50%, rgba(168, 85, 247, 0.12), transparent 25%),
+        radial-gradient(circle at 85% 30%, rgba(0, 229, 255, 0.12), transparent 25%);
+    background-size: 200% 200%;
+    animation: bg-pan 15s ease-in-out infinite alternate, page-fade-in 0.6s var(--ease-out-expo) forwards;
     color: var(--text-primary);
     height: 100vh;
     display: flex;
@@ -83,23 +88,16 @@ body {
     overflow: hidden;
     line-height: 1.5;
     opacity: 0;
-    animation: page-fade-in 0.6s var(--ease-out-expo) forwards;
+}
+
+@keyframes bg-pan {
+    0% { background-position: 0% 50%; }
+    100% { background-position: 100% 50%; }
 }
 
 @keyframes page-fade-in {
     0% { opacity: 0; }
     100% { opacity: 1; }
-}
-
-body::before {
-    content: '';
-    position: fixed;
-    inset: 0;
-    background: 
-        radial-gradient(ellipse at 50% 0%, rgba(168, 85, 247, 0.1) 0%, transparent 60%),
-        radial-gradient(ellipse at 80% 100%, rgba(255, 107, 53, 0.06) 0%, transparent 40%);
-    pointer-events: none;
-    z-index: 9999;
 }
 
 .app-container {
@@ -703,8 +701,8 @@ body::before {
 .piece.b {
     color: var(--piece-black);
     text-shadow: 
-        0 1px 2px rgba(255, 255, 255, 0.2),
-        0 0 15px rgba(0, 0, 0, 0.8);
+        0 2px 4px rgba(0, 0, 0, 0.5),
+        0 0 20px rgba(0, 255, 0, 0.4);
 }
 
 .game-status {
@@ -1202,4 +1200,122 @@ body::before {
         animation-duration: 0.01ms !important;
         transition-duration: 0.01ms !important;
     }
+}
+
+/* --- New UI Styles --- */
+
+.glass-panel {
+    background: rgba(30, 20, 45, 0.65);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+}
+
+.mode-choices, .lobby-actions {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-md);
+    margin-top: var(--space-md);
+}
+
+.mode-btn {
+    padding: var(--space-md);
+    font-size: 1.1rem;
+    justify-content: flex-start;
+}
+
+.mode-btn .btn-icon {
+    font-size: 1.5rem;
+    margin-right: var(--space-sm);
+}
+
+.divider {
+    display: flex;
+    align-items: center;
+    text-align: center;
+    color: var(--text-dim);
+    font-size: 0.8rem;
+    margin: var(--space-sm) 0;
+}
+
+.divider::before, .divider::after {
+    content: '';
+    flex: 1;
+    border-bottom: 1px solid var(--border-subtle);
+}
+
+.divider span {
+    padding: 0 var(--space-sm);
+}
+
+.join-room-container {
+    display: flex;
+    gap: var(--space-sm);
+}
+
+.join-room-container input {
+    flex: 1;
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid var(--border-subtle);
+    color: var(--text-primary);
+    padding: var(--space-sm);
+    border-radius: 4px;
+    font-family: var(--font-mono);
+    text-align: center;
+    font-size: 1.2rem;
+    letter-spacing: 0.2em;
+    outline: none;
+    text-transform: uppercase;
+}
+
+.join-room-container input:focus {
+    border-color: var(--accent-pink);
+    box-shadow: 0 0 10px rgba(255, 20, 147, 0.3);
+}
+
+.lobby-message {
+    color: var(--accent-coral);
+    font-size: 0.85rem;
+    text-align: center;
+    min-height: 1.2rem;
+}
+
+.icon-btn {
+    background: transparent;
+    border: none;
+    color: var(--text-primary);
+    font-size: 1.5rem;
+    cursor: pointer;
+    transition: color 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 var(--space-sm);
+}
+
+.icon-btn:hover {
+    color: var(--accent-pink);
+}
+
+.room-details {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: rgba(0, 0, 0, 0.2);
+    padding: var(--space-sm);
+    border-radius: 4px;
+    border: 1px dashed var(--border-subtle);
+}
+
+.room-label {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+}
+
+.room-code {
+    font-family: var(--font-mono);
+    font-size: 1rem;
+    color: var(--accent-pink);
+    letter-spacing: 0.1em;
 }
